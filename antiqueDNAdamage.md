@@ -5,6 +5,7 @@
 ## Background
 
 
+
 ### Ancient DNA damage
 
 DNA damage is so widespread in ancient specimens that it is actually used as a verification step to ensure the DNA is not contaminated with modern DNA. A few statistics are collected:
@@ -38,7 +39,9 @@ From their table S1, their most recent non-ethnographic sample (900 ybp) had a Î
 #### [Gutaker et al., 2019 Potato domestication](https://www.nature.com/articles/s41559-019-0921-3)
 
 - Potato herbarium specimens from 1680 - 1900
-- Using their data in Supplement, C-T probability is significantly correlated with age (r^2 = 0.37)
+- Using their data in Supplement, C-T probability is significantly correlated with age (r^2 = 0.37) (my plot of this below)
+
+![](https://i.imgur.com/6kH8Ssw.png)
 - [Supplementary Fig. 2](https://static-content.springer.com/esm/art%3A10.1038%2Fs41559-019-0921-3/MediaObjects/41559_2019_921_MOESM1_ESM.pdf) has MapDamage results with higher proportions of C-T SNPs (5-10%) in first 5 bp. 
 
 #### [Forrest et al., 2020 Preservation Methods and Plant DNA](https://internal-journal.frontiersin.org/articles/10.3389/fevo.2019.00439/full)
@@ -54,6 +57,32 @@ From their table S1, their most recent non-ethnographic sample (900 ybp) had a Î
 -  Not sure what's going on with the high G-to-A rate for a set of 1970s specimens, it's not addressed in the text. 
 -  Uracil-Specific Excision Reagent [(USER) Enzyme](https://www.neb.com/products/m5508-thermolabile-user-ii-enzyme#Product%20Information) may have contributed. This enzyme is also used in NEB Oligo kits. 
 
+## MapDamage
+
+https://ginolhac.github.io/mapDamage/
+
+### Installation
+Create a new conda environment with only what is needed and install MapDamage via bioconda, along with other tools needed for this analysis:
+
+`sudo conda create -n mapdamage mapdamage2 bwa samtools gatk4`
+
+activate conda environment: `conda activate mapdamage`
+
+command: `mapDamage`
+
+#### Inputs
+
+* A BAM file with a correct header
+* A FASTA file with reference sequences
+
+They recommend only including overlapping reads for highly degraded samples.
+
+#### Outputs
+
+* Plot with a fragmentation misincorporation patterns
+* Plot showing frequencies of C -> T 5' and G -> A 3'
+
+
 ## The Goals
 
 - Identify the extent of DNA damage in herbarium specimens sequenced via target capture.
@@ -61,7 +90,9 @@ From their table S1, their most recent non-ethnographic sample (900 ybp) had a Î
     - Population genetics
     - Phylogenetics
 
-## The data
+## Part 1: Mapping target capture data to a reference genome
+
+### Data
 
 Target capture data from *Artocarpus altilis* herbarium specimens spanning 200 years:
 
@@ -103,40 +134,14 @@ Aa_FM4_Mela	Takeuchi & Waikabu 15185	A. altilis	1994	F
 
 `wget https://bioinformatics.psb.ugent.be/gdb/aocc/artal/Artal_genome_LATEST.fa.gz`
 
-## The tools
 
-### MapDamage 
+### Setup Genome and Reads
 
-https://ginolhac.github.io/mapDamage/
-
-#### Installation
-Create a new conda environment with only what is needed and install MapDamage via bioconda, along with other tools needed for this analysis:
-
-`sudo conda create -n mapdamage mapdamage2 bwa samtools gatk4`
-
-activate conda environment: `conda activate mapdamage`
-
-command: `mapDamage`
-
-#### Inputs
-
-* A BAM file with a correct header
-* A FASTA file with reference sequences
-
-They recommend only including overlapping reads for highly degraded samples.
-
-#### Outputs
-
-* Plot with a fragmentation misincorporation patterns
-* Plot showing frequencies of C -> T 5' and G -> A 3'
-
-## MapDamage Analysis
-
-### Genome Reference
+#### Genome Reference
 
 `bwa index Artal_genome_LATEST.fa`
 
-### Map reads
+#### Map reads
 
 `bwa mem altilis_genome/Artal_genome_LATEST.fa reads/A_altilis_BS_combined.R* | samtools view -bS - > alignments/A_altilis_BS.genome.bam`
 
@@ -204,7 +209,7 @@ Number of non-rescaled reads due to improper pairing:  511560
 
 **Repeat with consensus reads?**
 
-## Map Damage Results
+### Results: DNA Damage in *Artocarpus altilis* herbarium specimens
 
 ### delta-s by Year
 
@@ -228,32 +233,133 @@ Number of non-rescaled reads due to improper pairing:  511560
 - Without the 1700s specimen, r^2 for 1stbp is 0.14
 ![](https://i.imgur.com/Nnazhe0.png)
 
+### How much does it matter?
 
-## Without a reference genome
+How can we get at the effect size without doing an entire masters' thesis worth of popgen? 
+
+## Analysis without a reference genome
+
+The availability of a reference genome is a major impediment to using MapDamage for most target capture data, which is done without a reference genome. 
+
+Can we use the supercontigs (exons and flanking non-coding regions) from deeply sequenced modern specimens to define a "reference genome," which can be used to compare older specimens?
+
+This won't be a fit for all circumstances, as many taxa are used from herbarium specimens precisely because there are no modern specimens available.
+
+However, identifying the DNA damage pattern is common to all herbarium specimens of certain age may allow us to use lab or bioinformatic methods that don't rely on MapDamage.
 
 ### Data
 
 Pairs of Artocarpus HybSeq datasets, one recent and one preserved.
-Represents different ages as well as preservation techniques (including alcohol)
+
+
+```csvpreview {header="true"}
+Run	Library no.	sample name	Run dir	File prefix	Species	year collected
+6	EGL222	EG441	run6	EG441_S66	altissimus	2016
+3	EGL73	EGL73	run3comb	EGL73comb_S17	altissimus	1934
+6	EGL212	EG333	run6	EG333_S56	corneri	2016
+7	EGL242	EGL242	run7	EGL242_S16	corneri	1963
+7	EGL231	EGL231	run7	EGL231_S5	glaucus	1979
+2	EGL38	NZ852	run2	NZ852_S14	glaucus	2013
+7	EGL238	EGL238	run7	EGL238_S12	griffithii	1932
+2	EGL50	NZ216	run2	NZ216_S26	griffithii	2002
+6	EGL181	Beguin1900	run6	Beguin1900_S23	horridus	1920
+6	EGL221	EG437	run6	EG437_S65	horridus	2016
+6	EGL187	EG170	run6	EG170_S31	hypargyraeus	2016
+3	EGL35	EGL35	run3comb	EGL35comb_S1	hypargyraeus	1941
+6	EGL180	S31741	run6	S31741_S22	obtusus	1972
+6	EGL203	EG248	run6	EG248_S47	obtusus	2016
+3	EGL78	EGL78	run3comb	EGL78comb_S22	xanthocarpus	1916
+4	EGL91	Yang15648	run4	Yang15648_S10	xanthocarpus	2003
+```
+
+Need to transfer the supercontigs from the recent specimens and the trimmed reads from the older specimens.
+
+### Setup
+
+Extract supercontigs for each new sample:
+
+```python=
+import os,sys
+from Bio import SeqIO
+
+
+new_namelist = [x.rstrip() for x in open("new_namelist.txt")]
+genefiles = os.listdir("big_phylogeny_supercontigs")
+
+for newID in new_namelist:
+    print(newID)
+    genecount = 0
+    with open("supercontigs/{}.supercontigs.fasta".format(newID),'w') as outfile:
+        for gene in genefiles:
+            geneID = gene.replace(".supercontig.raw.fasta","")
+            for seq in SeqIO.parse(os.path.join("big_phylogeny_supercontigs",gene),'fasta'):
+                if seq.id.endswith("_{}".format(newID)):
+                    seq.id = seq.id + "-{}".format(geneID)
+                    seq.description = ''
+                    SeqIO.write(seq,outfile,'fasta')
+                    genecount+=1
+    print("{} genes".format(genecount))
 
 ```
-Artocarpus altissimus (EG and BB)
-Artocarpus horridus (Beguin 1908, EG 2016)
-Artocarpus hypergyreus (EG 2016, Taam 1941)
-Artocarpus obtusus (S 1972, EG 2016)
-Artocarpus xanthocarpus (Yang 2003, Elmer 1916)
-Artocarpus anchuianensis = A. giffithii 1932, also 2002
-Artocarpus corneri (Fuchs 1963, EG 2016)
-Artocaprus cyrassifolius (2006 alcohol sample)
-Artocarpus longifolius ssp adpressus (1994 v 2016)
+
+Make a `species_pairs.txt` file that has the new sample, old sample, and species name:
+
 ```
+EG170 EGL35 hypargyraeus
+EG248 S31741 obtusus
+EG333 EGL242 corneri
+EG437 Beguin1900 horridus
+EG441 EGL73 altissimus
+NZ216 EGL238 griffithii
+NZ852 EGL231 glaucus
+Yang15648 EGL78 xanthocarpus
+
+```
+
+Bash script to contain the workflow through MapDamage:
+
+```bash=
+set -eo pipefail
+new=$1
+old=$2
+species=$3
+
+echo $new 
+echo $old $species
+
+mkdir -p $species
+cd $species
+
+
+source activate mapdamage
+bwa index ../supercontigs/$new.supercontigs.fasta
+bwa mem ../supercontigs/$new.supercontigs.fasta ../reads/old/"$old"*.fastq | samtools view -bS - > $old.$new.bam
+samtools sort  $old.$new.bam -o $old.$new.sorted.bam
+samtools index $old.$new.sorted.bam
+gatk MarkDuplicates -R ../supercontigs/$new.supercontigs.fasta -I $old.$new.sorted.bam -M $new.dups.txt -O $old.$new.marked.bam
+mapDamage -i $old.$new.marked.bam -r ../supercontigs/$new.supercontigs.fasta --merge-reference-sequences -y 0.1
+
+```
+
+Run on all the pairs of samples:
+
+`parallel --colsep ' ' bash map_by_sp.sh {1} {2} {3} :::: species_pairs.txt`
+
 
 ### Analysis
 
-## How much does it matter?
+#### Distribution of DNA damage in old/new pairs
+
+Two samples had high deltaS scores: EGL78 (*A. xanthocarpus* from 1916, deltaS = 0.53) and EGL73 (*A. altissimus* from 1934, deltaS = 0.61). Both values are much higher than anything seen with *A. altilis*. 
+
+#### Phylogeny with damaged herbarium supercontigs
+
+#### Phylogeny after trimming damaged herbarium specimens more aggressively
 
 
 
-### genetic distance before and after recoding in Mapdamage
 
-- rerun hybpiper with fixed reads?
+
+
+
+
