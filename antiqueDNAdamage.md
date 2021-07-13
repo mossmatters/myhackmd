@@ -235,7 +235,15 @@ Number of non-rescaled reads due to improper pairing:  511560
 
 ### How much does it matter?
 
-How can we get at the effect size without doing an entire masters' thesis worth of popgen? 
+How can we get at the effect size without doing an entire masters' thesis worth of popgen?
+
+### Fixing the oldest specimen
+Try again after removing all reads > 200 bp
+
+```
+fastp --length_limit 200 -i A_altilis_BS_combined.R1.paired.fastq -o A_altilis_BSnolong_combined.R1.paired.fastq -I A_altilis_BS_combined.R2.paired.fastq -O A_altilis_BSnolong_combined.R2.paired.fastq
+```
+
 
 ## Analysis without a reference genome
 
@@ -253,24 +261,29 @@ Pairs of Artocarpus HybSeq datasets, one recent and one preserved.
 
 
 ```csvpreview {header="true"}
-Run	Library no.	sample name	Run dir	File prefix	Species	year collected
+Run	Library	samplename	Rundir	Fileprefix	Species	year
+NA	US008	US008	NA	US008_S13	altilis	1896
+4	EGL94	900260-001	run4	900260-001_S13	altilis	2000
+3	EGL73	BB18789	run3comb	EGL73comb_S17	altissimus	1934
 6	EGL222	EG441	run6	EG441_S66	altissimus	2016
-3	EGL73	EGL73	run3comb	EGL73comb_S17	altissimus	1934
+7	EGL242	Fuchs21347	run7	EGL242_S16	corneri	1963
 6	EGL212	EG333	run6	EG333_S56	corneri	2016
-7	EGL242	EGL242	run7	EGL242_S16	corneri	1963
-7	EGL231	EGL231	run7	EGL231_S5	glaucus	1979
+7	EGL231	Dunlop5189	run7	EGL231_S5	glaucus	1979
 2	EGL38	NZ852	run2	NZ852_S14	glaucus	2013
-7	EGL238	EGL238	run7	EGL238_S12	griffithii	1932
+7	EGL238	Krukoff4372	run7	EGL238_S12	griffithii	1932
 2	EGL50	NZ216	run2	NZ216_S26	griffithii	2002
 6	EGL181	Beguin1900	run6	Beguin1900_S23	horridus	1920
 6	EGL221	EG437	run6	EG437_S65	horridus	2016
+3	EGL35	Taam2259	run3comb	EGL35comb_S1	hypargyraeus	1941
 6	EGL187	EG170	run6	EG170_S31	hypargyraeus	2016
-3	EGL35	EGL35	run3comb	EGL35comb_S1	hypargyraeus	1941
 6	EGL180	S31741	run6	S31741_S22	obtusus	1972
 6	EGL203	EG248	run6	EG248_S47	obtusus	2016
-3	EGL78	EGL78	run3comb	EGL78comb_S22	xanthocarpus	1916
+7	EGL254	Elmer12468	NA	EGL254_S28	treculanis	1910
+2	EGL34	NZ203	NA	NZ203_S10	treculanis	2000
+3	EGL78	Elmer16247	run3comb	EGL78comb_S22	xanthocarpus	1916
 4	EGL91	Yang15648	run4	Yang15648_S10	xanthocarpus	2003
 ```
+![](https://i.imgur.com/EMG1C5E.png)
 
 Need to transfer the supercontigs from the recent specimens and the trimmed reads from the older specimens.
 
@@ -356,10 +369,46 @@ Two samples had high deltaS scores: EGL78 (*A. xanthocarpus* from 1916, deltaS =
 
 #### Phylogeny after trimming damaged herbarium specimens more aggressively
 
+Use FASTP to trim 5 bp from the beginning and end of every read.
+
+```
+parallel fastp -I ../to_supercontigs/reads/old/{}*R1*_paired.fastq -O reads/{}.trim5.R1.fastq -i ../to_supercontigs/reads/old/{}*R2*_paired.fastq -o reads/{}.trim5.R2.fastq -f 8 -t 8 -F 8 -T 8 -h {}.html -j {}.json :::: old_namelist.txt
+```
+Re-run HybPiper for these samples
+
+`while read name; do /opt/apps/Software/HybPiper/reads_first.py -r reads/$name* -b newref.fna --bwa --prefix $name --cpu 50; python /opt/apps/Software/HybPiper/intronerate.py --prefix $name; python /opt/apps/Software/HybPiper/cleanup.py $name; done < old_namelist.txt`
+
+MAFFT
+
+`parallel "mafft --preservecase --localpair --maxiterate 1000 unaligned/{}.supercontig.chomped.fasta > mafft/{}.supercontig.chomped.mafft.fasta" :::: ../../trimmed/candidate_genes.txt`
+
+TRIMAL
+
+`parallel trimal -gt 0.5 -in mafft/{}.supercontig.chomped.mafft.fasta -out trimal/{}.supercontig.chomped.trimal.fasta :::: ../../trimmed/candidate_genes.txt`
+
+Remove gene name from sequence name so they can be combned:
+
+`parallel sed -i "s/-{}//g" {}.supercontig.chomped.trimal.fasta :::: ../../../trimmed/candidate_genes.txt`
+
+Combine
+
+`python /opt/apps/Software/HybPiper/fasta_merge.py --fastafiles trimal/*.fasta > artocarpus.chomped.concat.fasta`
+
+
+Phylo
+
+`iqtree -s artocarpus.chomped.concat.fasta -m MFP -B 100`
 
 
 
+Repeat with original supercontigs, no chomping
+ 
+`parallel "mafft --preservecase --localpair --maxiterate 1000 unaligned/{}.supercontig.untrimmed.fasta > mafft/{}.supercontig.untrimmed.mafft.fasta" :::: ../../trimmed/candidate_genes.txt`
 
+`parallel trimal -gt 0.5 -in mafft/{}.supercontig.untrimmed.mafft.fasta -out trimal/{}.supercontig.untrimmed.trimal.fasta :::: ../.trimmed/candidate_genes.txt`
 
+`parallel sed -i "s/-{}//g" {}.supercontig.untrimmed.trimal.fasta :::: ../../../trimmed/candidate_genes.txt`
+
+`python /opt/apps/Software/HybPiper/fasta_merge.py --fastafiles trimal/*.fasta > artocarpus.untrimmed.concat.fasta`
 
 
